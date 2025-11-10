@@ -7,6 +7,8 @@
 #pragma comment(lib, "Comctl32.lib")
 
 BOOL CALLBACK DlgProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
+CHAR* FormatAddress(CHAR szBuffer[], CONST CHAR szMessage[], DWORD dwAddress);
+CHAR* FormatNumber(CHAR szBuffer[], CONST CHAR szMessage[], DWORD dwNumber);
 
 INT WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInst, LPSTR lpCmdLine, INT nCmdShow)
 {
@@ -31,20 +33,23 @@ BOOL CALLBACK DlgProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 		HWND hIPaddress = GetDlgItem(hwnd, IDC_IPADDRESS);
 		HWND hIPmask = GetDlgItem(hwnd, IDC_IPMASK);
 		HWND hEditPrefix = GetDlgItem(hwnd, IDC_EDIT_PREFIX);
-		/*DWORD dwIPaddress = 0;
+		HWND hStaticInfo = GetDlgItem(hwnd, IDC_STATIC_INFO);
+
+		DWORD dwIPaddress = 0;
 		DWORD dwIPmask = UINT_MAX;
 		DWORD dwIPprefix = 0;
-		CHAR szIPprefix[3] = {};*/
+		CHAR szIPprefix[3] = {};
+
 		switch (LOWORD(wParam))
 		{
 		case IDC_IPADDRESS:
 		{
 			if (HIWORD(wParam) == EN_CHANGE)
 			{
-				DWORD dwIPaddress = 0;
+				/*DWORD dwIPaddress = 0;
 				DWORD dwIPmask = UINT_MAX;
 				DWORD dwIPprefix = 0;
-				CHAR szIPprefix[3] = {};
+				CHAR szIPprefix[3] = {};*/
 
 				SendMessage(hIPaddress, IPM_GETADDRESS, 0, (LPARAM)&dwIPaddress);
 				DWORD dwFirst = FIRST_IPADDRESS(dwIPaddress);
@@ -79,9 +84,9 @@ BOOL CALLBACK DlgProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 			if (HIWORD(wParam) == EN_CHANGE)
 			{
 
-				DWORD dwIPmask = UINT_MAX;
+				/*DWORD dwIPmask = UINT_MAX;
 				DWORD dwIPprefix = 0;
-				CHAR szIPprefix[3] = {};
+				CHAR szIPprefix[3] = {};*/
 
 				SendMessage(hEditPrefix, WM_GETTEXT, 3, (LPARAM)szIPprefix);
 				dwIPprefix = atoi(szIPprefix);
@@ -97,7 +102,33 @@ BOOL CALLBACK DlgProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 		}
 		break;
 		case IDOK:
-			break;
+		{
+			SendMessage(hIPaddress, IPM_GETADDRESS, 0, (LPARAM)&dwIPaddress);
+			SendMessage(hIPmask, IPM_GETADDRESS, 0, (LPARAM)&dwIPmask);
+			DWORD dwNetworkAddress = dwIPaddress & dwIPmask;
+			DWORD dwBroadcastAddress = dwIPaddress | ~dwIPmask;
+			DWORD dwCapacity = dwBroadcastAddress - dwNetworkAddress + 1;
+			DWORD dwHosts = dwCapacity - 2;
+
+			CONST INT SIZE = 256;
+			CHAR szInfo[SIZE] = "";
+			CHAR szNetwork[SIZE] = "";
+			CHAR szBroadcast[SIZE] = "";
+			CHAR szCapacity[SIZE] = "";
+			CHAR szHosts[SIZE] = "";
+
+			sprintf
+			(
+				szInfo,
+				"Info:\n%s\n%s\n%s\n%s\n",
+				FormatAddress(szNetwork, "Адрес сети:\t\t\t", dwNetworkAddress),
+				FormatAddress(szBroadcast, "Широковещательный адрес:\t", dwBroadcastAddress),
+				FormatNumber(szCapacity, "Количество IP-адресов:\t", dwCapacity),
+				FormatNumber(szHosts, "Количество узлов:\t\t", dwHosts)
+			);
+			SendMessage(hStaticInfo, WM_SETTEXT, 0, (LPARAM)szInfo);
+		}
+		break;
 		case IDCANCEL:
 			EndDialog(hwnd, 0);
 			break;
@@ -108,7 +139,7 @@ BOOL CALLBACK DlgProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 	{
 		//if (wParam == IDC_IPMASK)
 		//if(((LPNMHDR)lParam)->code == IPN_FIELDCHANGED)
-		if(((LPNMHDR)lParam)->hwndFrom == GetDlgItem(hwnd, IDC_IPMASK))
+		if (((LPNMHDR)lParam)->hwndFrom == GetDlgItem(hwnd, IDC_IPMASK))
 		{
 			HWND hIPmask = GetDlgItem(hwnd, IDC_IPMASK);
 			HWND hEditPrefix = GetDlgItem(hwnd, IDC_EDIT_PREFIX);
@@ -133,4 +164,30 @@ BOOL CALLBACK DlgProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 		EndDialog(hwnd, 0);
 	}
 	return FALSE;
+}
+
+CHAR* FormatAddress(CHAR szBuffer[], CONST CHAR szMessage[], DWORD dwAddress)
+{
+	sprintf
+	(
+		szBuffer,
+		"%s%i.%i.%i.%i;",
+		szMessage,
+		FIRST_IPADDRESS(dwAddress),
+		SECOND_IPADDRESS(dwAddress),
+		THIRD_IPADDRESS(dwAddress),
+		FOURTH_IPADDRESS(dwAddress)
+	);
+	return szBuffer;
+}
+CHAR* FormatNumber(CHAR szBuffer[], CONST CHAR szMessage[], DWORD dwNumber)
+{
+	sprintf
+	(
+		szBuffer,
+		"%s%i;",
+		szMessage,
+		dwNumber
+	);
+	return szBuffer;
 }
