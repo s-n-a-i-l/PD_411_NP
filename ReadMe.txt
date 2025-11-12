@@ -6,6 +6,11 @@ https://macvendors.com/
 https://standards.ieee.org/products-programs/regauth/mac/
 
 TODO:
+1. Сделать COMMIT и создать ветку 'WinSockHW_1';
+2. Обеспечить возможность с клиента писать текстовые сообщения на Сервер,
+   до ввода 'exit' или 'quit';
+
+DONE:
 1. При изменении префикса должна меняться и маска;
 2. Добить прогу;
 
