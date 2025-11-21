@@ -12,7 +12,17 @@ using namespace std;
 #pragma comment(lib, "WS2_32.lib")
 
 #define DEFAULT_PORT	"27015"
-#define BUFFER_LENGTH	1460
+#define BUFFER_LENGTH	  1460
+#define MAX_CLIENTS			 3
+#define g_sz_SORRY		"Error: Количество подключений превышено"
+#define IP_STR_MAX_LENGTH	16
+
+INT n = 0;//кол-во акетив клиентов
+SOCKET client_sockets[MAX_CLIENTS] = {};
+DWORD threadIDs[MAX_CLIENTS] = {};
+HANDLE hThreads[MAX_CLIENTS] = {};
+
+VOID HandleClient(SOCKET client_socket);
 
 int main()
 {
@@ -52,6 +62,7 @@ int main()
 		return dwLastError;
 	}
 
+
 	//3) Создаем сокет, который будет прослушивать Сервер:
 	SOCKET listen_socket = socket(result->ai_family, result->ai_socktype, result->ai_protocol);
 	if (listen_socket == INVALID_SOCKET)
@@ -62,6 +73,7 @@ int main()
 		WSACleanup();
 		return dwLastError;
 	}
+
 
 	//4) Bind socket:
 	iResult = bind(listen_socket, result->ai_addr, result->ai_addrlen);
@@ -74,6 +86,7 @@ int main()
 		WSACleanup();
 		return dwLastError;
 	}
+
 
 	//5) Запускаем прослшивание сокета:
 	iResult = listen(listen_socket, SOMAXCONN);
@@ -88,25 +101,93 @@ int main()
 	}
 
 	//6) Обработка запросов от клиентов:
+	
+	cout << hThreads << endl;
+	cout << HandleClient << endl;
 	cout << "Accept client connections..." << endl;
-
-	SOCKET client_socket = accept(listen_socket, NULL, NULL);
-	if (client_socket == INVALID_SOCKET)
+	do
 	{
-		dwLastError = WSAGetLastError();
-		cout << "Accept failed with error: " << dwLastError << endl;
-		closesocket(listen_socket);
-		freeaddrinfo(result);
-		WSACleanup();
-		return dwLastError;
-	}
+		SOCKET client_socket = accept(listen_socket, NULL, NULL);
+		/*if (client_sockets[n] == INVALID_SOCKET)
+		{
+			dwLastError = WSAGetLastError();
+			cout << "Accept failed with error: " << dwLastError << endl;
+			closesocket(listen_socket);
+			freeaddrinfo(result);
+			WSACleanup();
+			return dwLastError;
+		}*/
+		//HandleClient(client_socket);
+		if (n < MAX_CLIENTS)
+		{
+			client_sockets[n] = client_socket;
+			hThreads[n] = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)HandleClient, (LPVOID)client_sockets[n], 0, threadIDs + n);
+			n++;
+		}
+		else
+		{
+			CHAR recv_buffer[BUFFER_LENGTH] = {};
+			INT iResult = recv(client_socket, recv_buffer, BUFFER_LENGTH, 0);
+			if (iResult > 0)
+			{
+				cout << "Bytes received: " << iResult << endl;
+				cout << "Message: " << recv_buffer << endl;
+				INT iSendResult = send(client_socket, g_sz_SORRY, strlen(g_sz_SORRY), 0);
+				closesocket(client_socket);
+			}
+		}
+	} while (true);
 
+	WaitForMultipleObjects(MAX_CLIENTS, hThreads, TRUE, INFINITE);
+
+	closesocket(listen_socket);
+	freeaddrinfo(result);
+	WSACleanup();
+	return dwLastError;
+}
+
+INT GetSlotIndex(DWORD dwID)
+{
+	for (int i = 0; i < MAX_CLIENTS; i++)
+	{
+		if (threadIDs[i] == dwID)return i;
+	}
+}
+VOID Shift(INT start)
+{
+	for (INT i = start; i < MAX_CLIENTS; i++)
+	{
+		client_sockets[i] = client_sockets[i + 1];
+		threadIDs[i] = threadIDs[i + 1];
+		hThreads[i] = hThreads[i + 1];
+	}
+	client_sockets[MAX_CLIENTS - 1] = NULL;
+	threadIDs[MAX_CLIENTS - 1] = NULL;
+	hThreads[MAX_CLIENTS - 1] = NULL;
+	n--;
+}
+VOID Broadcast(CONST CHAR message[], SOCKET source)
+{
+	for (int i = 0; i < n; i++)
+	{
+		if (client_sockets[i] != source)
+		{
+			INT iResult = send(client_sockets[i], message, strlen(message), 0);
+		}
+	}
+}
+
+VOID HandleClient(SOCKET client_socket)
+{
+	//SOCKET client_socket = (SOCKET)lp_client_socket;
+	DWORD dwLastError = 0;
+	INT iResult = 0;
 	//7)Получение запросов от клиента:
 	do
 	{
-	  CHAR send_buffer[BUFFER_LENGTH] = "Привет клиент";
-	  CHAR recv_buffer[BUFFER_LENGTH] = {};
-	  INT iSendResult = 0;
+		CHAR send_buffer[BUFFER_LENGTH] = "Привет клиент";
+		CHAR recv_buffer[BUFFER_LENGTH] = {};
+		INT iSendResult = 0;
 
 		iResult = recv(client_socket, recv_buffer, BUFFER_LENGTH, 0);
 		if (iResult > 0)
@@ -130,8 +211,4 @@ int main()
 		}
 	} while (iResult > 0);
 	closesocket(client_socket);
-	closesocket(listen_socket);
-	freeaddrinfo(result);
-	WSACleanup();
-	return dwLastError;
 }
